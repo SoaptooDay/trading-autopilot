@@ -136,7 +136,10 @@ def backtest(days):
     start = end - dt.timedelta(days=int(days * 7 / 5) + 100)      # test window + 60-session history
     bars = fetch_bars(settings["symbols"], start.strftime("%Y-%m-%dT%H:%M:%SZ"), end.strftime("%Y-%m-%dT%H:%M:%SZ"))
     all_days = sorted({d for by in bars.values() for d in by})
-    test_days = [d for d in all_days if d < end.astimezone(NY).date().isoformat()][-days:]
+    now_ny = end.astimezone(NY)
+    done_today = now_ny.hour * 60 + now_ny.minute >= 16 * 60 + 5     # today's session is complete
+    test_days = [d for d in all_days if d < now_ny.date().isoformat()
+                 or (done_today and d == now_ny.date().isoformat())][-days:]
     cands = {d: candidates_for_day(d, bars, strats) for d in test_days}
     results, equity, taken = compare(cands, rs, cfg, fx)
     os.makedirs(RESEARCH, exist_ok=True)
