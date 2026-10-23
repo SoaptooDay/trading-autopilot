@@ -1,0 +1,47 @@
+name: Trading session
+on:
+  schedule:
+    - cron: "45 12 * * 1-5"   # 12:45 UTC = 08:45 New York (summer) / 07:45 (winter); waits for the open
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (no orders)"
+        type: boolean
+        default: true
+permissions:
+  contents: read
+concurrency:
+  group: autopilot-journal
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out the private journal
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/trading-journal
+          token: ${{ secrets.JOURNAL_TOKEN }}
+          path: data
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run autopilot (paper)
+        env:
+          ALPACA_API_KEY_ID: ${{ secrets.ALPACA_API_KEY_ID }}
+          ALPACA_API_SECRET_KEY: ${{ secrets.ALPACA_API_SECRET_KEY }}
+          AUTOPILOT_DATA: ${{ github.workspace }}/data
+          AUTOPILOT_QUIET: "1"
+        run: python autopilot/autopilot.py --no-flatten ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
+      - name: Save to the private journal
+        if: always()
+        working-directory: data
+        run: |
+          git config user.name "autopilot"
+          git config user.email "autopilot@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -q -m "autopilot $(date -u +%F) session.yml"
+          git pull -q --rebase && git push -q

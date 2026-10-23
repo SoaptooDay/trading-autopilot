@@ -1,0 +1,6 @@
+autopilot/keys.txt
+trader/
+logs/
+journal.csv
+settings.json
+__pycache__/
