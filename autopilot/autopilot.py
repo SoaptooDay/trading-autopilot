@@ -204,6 +204,9 @@ class MarketClock:
         self.next_open = parse_ts(c["next_open"])
         self.next_close = parse_ts(c["next_close"])
 
+    def next_open_ny(self):
+        return self.next_open.astimezone(dt.timezone(self.offset)).replace(tzinfo=None)
+
     def now_ny(self):
         return (dt.datetime.now(dt.timezone.utc) + self.offset).replace(tzinfo=None)
 
@@ -356,7 +359,7 @@ def day_pnl(broker, day):
 # ------------------------------------------------------------------ the session
 def session(broker, clock, cfg, settings, dry_run=False, no_flatten=False):
     day = clock.now_ny().date().isoformat()
-    open_ny = (clock.next_open + clock.offset).replace(tzinfo=None) if not clock.is_open else None
+    open_ny = clock.next_open_ny() if not clock.is_open else None
     if open_ny and open_ny.date() != clock.now_ny().date():
         log("Market is closed today (next open %s). Nothing to do." % open_ny.strftime("%a %d %b %H:%M ET"))
         return
@@ -443,7 +446,7 @@ def market_day(clock):
     """True if NYSE trades today (New York date)."""
     if clock.is_open:
         return True
-    return (clock.next_open + clock.offset).date() == clock.now_ny().date()
+    return clock.next_open_ny().date() == clock.now_ny().date()
 
 
 def main(argv=None):
@@ -478,7 +481,7 @@ def _main(a):
         acct = broker.account()
         log("Connected to Alpaca PAPER. Account %s, status %s, equity $%s, buying power $%s."
             % (acct.get("account_number"), acct.get("status"), acct.get("equity"), acct.get("buying_power")))
-        log("Market open now: %s. Next open: %s (New York time)." % (clock.is_open, (clock.next_open + clock.offset).strftime("%a %d %b %H:%M")))
+        log("Market open now: %s. Next open: %s (New York time)." % (clock.is_open, clock.next_open_ny().strftime("%a %d %b %H:%M")))
         log("Limits: budget $%s, max loss/trade $%s, max daily loss $%s, %s trade(s)/day, %sR target."
             % (cfg["budget"], cfg["max_loss_per_trade_usd"], cfg["max_daily_loss_usd"],
                cfg["max_trades_per_day"], settings["target_r"]))
